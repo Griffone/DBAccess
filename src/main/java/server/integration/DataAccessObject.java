@@ -8,7 +8,10 @@ package server.integration;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.EntityTransaction;
+import javax.persistence.NoResultException;
 import javax.persistence.Persistence;
+import javax.persistence.Query;
+import server.model.Account;
 
 /**
  * A wrapper for all interactions between the database and the server
@@ -24,6 +27,48 @@ public class DataAccessObject {
     
     public DataAccessObject() {
         emf = Persistence.createEntityManagerFactory(ENTITY_MANAGER_NAME);
+    }
+    
+    public Account findAccount(String username, boolean endTransaction) {
+        if (username == null)
+            return null;
+        
+        try {
+            EntityManager em = beginTransaction();
+            try {
+                Query q = em.createNamedQuery("findAccountByName", Account.class);
+                q.setParameter("name", username);
+                return (Account) q.getSingleResult();
+            } catch (NoResultException ex) {
+                return null;
+            }
+        } finally {
+            if (endTransaction)
+                commitTransaction();
+        }
+    }
+    
+    public boolean deleteAccount(String username) {
+        if (username == null)
+            return false;
+        
+        try {
+            EntityManager em = beginTransaction();
+            Query q = em.createNamedQuery("deleteAccountByName", Account.class);
+            q.setParameter("name", username);
+            return q.executeUpdate() > 0;
+        } finally {
+            commitTransaction();
+        }
+    }
+    
+    public void createAccount(Account account) {
+        try {
+            EntityManager em = beginTransaction();
+            em.persist(account);
+        } finally {
+            commitTransaction();
+        }
     }
     
     /**

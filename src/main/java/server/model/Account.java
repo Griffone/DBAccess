@@ -7,7 +7,8 @@ package server.model;
 
 import common.AccountDTO;
 import java.io.Serializable;
-import java.util.Set;
+import java.util.LinkedList;
+import java.util.List;
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -24,12 +25,12 @@ import javax.persistence.Version;
     
     @NamedQuery(
             name = "deleteAccountByName",
-            query = "DELETE FROM Account acct WHERE acct.holder.name LIKE :holderName"
+            query = "DELETE FROM Account account WHERE account.username LIKE :name"
     ),
     
     @NamedQuery(
             name = "findAccountByName",
-            query = "SELECT acct FROM Account acct WHERE acct.holder.name LIKE :holderName",
+            query = "SELECT account FROM Account account WHERE account.username LIKE :name",
             lockMode = LockModeType.OPTIMISTIC
     )
 })
@@ -56,20 +57,20 @@ public class Account implements Serializable {
     @Column(name = "PASSWORD", nullable = false)
     public String password;
     
-    @OneToMany(cascade=CascadeType.ALL, mappedBy="Account")
-    public Set<File> files;
+    @OneToMany(cascade=CascadeType.ALL, mappedBy="owner")
+    public List<File> files;
     
     /**
      * A default 0-arg constructor that is required by JPA
      */
     public Account() {
-        this(null, null, null);
+        this(null, null);
     }
     
-    public Account(String username, String password, Set<File> files) {
+    public Account(String username, String password) {
         this.username = username;
         this.password = password;
-        this.files = files;
+        this.files = new LinkedList();
     }
     
     public AccountDTO toDTO() {
@@ -77,7 +78,6 @@ public class Account implements Serializable {
     }
     
     public void appendFile(File file) {
-        if (!files.contains(file))
-            files.add(file);
+        files.add(file);
     }
 }

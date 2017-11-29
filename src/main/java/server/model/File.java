@@ -7,6 +7,7 @@ package server.model;
 
 import common.FileDTO;
 import java.io.Serializable;
+import java.util.Objects;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -61,5 +62,20 @@ public class File implements Serializable {
     
     public FileDTO toDTO() {
         return new FileDTO(owner.toDTO(), name, size, isPublic, isReadOnly);
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (o.getClass() == this.getClass())
+            return this.name.compareTo(((File)o).name) == 0;
+        else
+            return false;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 59 * hash + Objects.hashCode(this.name);
+        return hash;
     }
 }
