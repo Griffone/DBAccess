@@ -26,7 +26,7 @@ public class Server {
             Server server = new Server();
             server.startRMIServant();
             System.out.println("File System Server started.");
-        } catch (RemoteException | MalformedURLException e) {
+        } catch (RemoteException | MalformedURLException ex) {
             System.err.println("Failed to start bank server.");
         }
     }

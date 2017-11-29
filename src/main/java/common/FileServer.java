@@ -6,6 +6,7 @@
 package common;
 
 import java.net.SocketAddress;
+import java.net.UnknownHostException;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.List;
@@ -23,9 +24,10 @@ public interface FileServer extends Remote {
      * Get the server's socket address for file transfer
      * 
      * @return SocketAddress of the server's listening socket
-     * @throws RemoteException 
+     * @throws RemoteException - rmi thrown exception
+     * @throws UnknownHostException - could not resolve local host address
      */
-    public SocketAddress getServerAddress() throws RemoteException;
+    public SocketAddress getServerAddress() throws RemoteException, UnknownHostException;
     
     /**
      * Create a new acccount with provided name and password.
@@ -37,6 +39,15 @@ public interface FileServer extends Remote {
      * @throws RemoteException - rmi thrown exception
      */
     public boolean createAccount(String name, String password) throws RemoteException;
+    
+    /**
+     * Delete the current account.
+     * Invalidates the porovided session
+     * 
+     * @param session current session
+     * @throws RemoteException - rmi thrown exception
+     */
+    public void deleteAccount(Session session) throws RemoteException;
     
     /**
      * Attempt to login
@@ -51,10 +62,10 @@ public interface FileServer extends Remote {
     
     /**
      * Log out.
-     * Invalidates the provided sessionID
+     * Invalidates the provided session
      * 
-     * @param session
-     * @throws RemoteException 
+     * @param session current session
+     * @throws RemoteException - rmi thrown exception
      */
     public void logout(Session session) throws RemoteException;
     

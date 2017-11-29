@@ -13,17 +13,38 @@ import java.io.Serializable;
  *
  * @author Griffone
  */
-public interface FileDTO extends Serializable {
-    
-    public String getName();
-    public long getSize();
-    
-    public boolean isPublic();
+public class FileDTO implements Serializable {
     
     /**
-     * Only needs to make sense if isPublic() is true
-     * 
-     * @return true if the file is read-only publically, false if other users can override this file
+     * The name of the file
      */
-    public boolean isReadOnly();
+    public final String name;
+    
+    /**
+     * The size of the file
+     */
+    public final long size;
+    
+    /**
+     * Can the file be viewed by non-owner accounts?
+     */
+    public final boolean isPublic;
+    
+    /**
+     * Can non-owner account only read the file? Only used when isPublic is true
+     */
+    public final boolean isReadOnly;
+
+    /**
+     * The owner account
+     */
+    public final AccountDTO owner;
+    
+    public FileDTO(AccountDTO owner, String name, long size, boolean isPublic, boolean isReadOnly) {
+        this.owner = owner;
+        this.name = name;
+        this.size = size;
+        this.isPublic = isPublic;
+        this.isReadOnly = isReadOnly;
+    }
 }

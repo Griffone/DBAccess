@@ -12,7 +12,11 @@ import java.io.Serializable;
  *
  * @author Griffone
  */
-public interface AccountDTO extends Serializable {
+public class AccountDTO implements Serializable {
     
-    public String getName();
+    public final String username;
+    
+    public AccountDTO(String name) {
+        this.username = name;
+    }
 }
