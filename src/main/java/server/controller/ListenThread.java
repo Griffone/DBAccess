@@ -16,6 +16,7 @@ import java.net.Socket;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import server.model.FileModel;
 import server.startup.Server;
 
 /**
@@ -91,14 +92,20 @@ public class ListenThread implements Runnable {
         if (count != fileSize)
             throw new IOException("Wrong file size!");
         
-        File file = new File(Server.FILES_DIR, transaction.file.name);
+        File file = new File(Server.FILES_DIR, transaction.file.getName());
         if (file.exists())
             file.delete();
         FileOutputStream fs = new FileOutputStream(file);
         fs.write(bytes);
         fs.flush();
-        transaction.file.size = fileSize;
-        transaction.dao.createFile(transaction.file);
+        if (transaction.alreadyExists) {
+            FileModel workFile = transaction.dao.findFile(transaction.file.getName(), false);
+            workFile.setSize(fileSize);
+            transaction.dao.updateEntity();
+        } else {
+            transaction.file.setSize(fileSize);
+            transaction.dao.createFile(transaction.file);
+        }
     }
     
     /**
@@ -108,7 +115,7 @@ public class ListenThread implements Runnable {
      * @param out 
      */
     private void downloadFile(InputStream in, OutputStream out, Transaction transaction) throws IOException {
-        File file = new File(Server.FILES_DIR, transaction.file.name);
+        File file = new File(Server.FILES_DIR, transaction.file.getName());
         int fileSize;
         if (file.exists())
             fileSize = (int) file.length();

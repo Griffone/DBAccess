@@ -58,7 +58,7 @@ public class Controller extends UnicastRemoteObject implements FileServer {
         
         AccountModel account = clients.get(session.id).account;
         if (account != null)
-            dao.deleteAccount(account.username);
+            dao.deleteAccount(account.getName());
     }
 
     @Override
@@ -67,7 +67,7 @@ public class Controller extends UnicastRemoteObject implements FileServer {
             AccountModel account = dao.findAccount(name, false);
             if (account == null)
                 throw new LoginException();
-            if (account.password.compareTo(password) != 0)
+            if (!account.isPassword(password))
                 throw new LoginException();
 
             // Extremely unlikely the server is stable enough to handle a total of 9,223,372,036,854,775,807 clients, but this isn't very expensive check
@@ -77,7 +77,7 @@ public class Controller extends UnicastRemoteObject implements FileServer {
             if (clients.containsKey(session.id))
                 throw new SessionException();
 
-            account.lastSessionID = session.id;
+            account.updateSessionID(session.id);
             clients.put(session.id, new Client(account, client));
             return session;
         } finally {
@@ -110,7 +110,7 @@ public class Controller extends UnicastRemoteObject implements FileServer {
         if (++lastTransactionID == 0)
             lastTransactionID++;
         long transactionID = lastTransactionID;
-        listener.transactions.put(transactionID, new Transaction(TransactionType.TT_CLIENT_TO_SERVER, clients.get(session.id), file, dao));
+        listener.transactions.put(transactionID, new Transaction(TransactionType.TT_CLIENT_TO_SERVER, clients.get(session.id), file, dao, false));
         return transactionID;
     }
     
@@ -127,13 +127,13 @@ public class Controller extends UnicastRemoteObject implements FileServer {
             throw new FileException();
         
         Client client = clients.get(session.id);
-        if (!file.isPublic && !client.account.equals(file.owner))
+        if (!file.isPublic() && client.account.getName().equals(file.getOwnerName()))
             throw new PermissionException();
         
         if (++lastTransactionID == 0)
             lastTransactionID++;
         long transactionID = lastTransactionID;
-        listener.transactions.put(transactionID, new Transaction(TransactionType.TT_SERVER_TO_CLIENT, client, file, dao));
+        listener.transactions.put(transactionID, new Transaction(TransactionType.TT_SERVER_TO_CLIENT, client, file, dao, true));
         notifyOwner(file, client, "downloaded");
         return transactionID;
     }
@@ -151,13 +151,13 @@ public class Controller extends UnicastRemoteObject implements FileServer {
             throw new FileException();
         
         Client client = clients.get(session.id);
-        if ((!file.isPublic || file.isReadOnly) && !client.account.equals(file.owner))
+        if ((!file.isPublic() || file.isReadOnly()) && !client.account.getName().equals(file.getOwnerName()))
             throw new PermissionException();
         
         if (++lastTransactionID == 0)
             lastTransactionID++;
         long transactionID = lastTransactionID;
-        listener.transactions.put(transactionID, new Transaction(TransactionType.TT_CLIENT_TO_SERVER, client, file, dao));
+        listener.transactions.put(transactionID, new Transaction(TransactionType.TT_CLIENT_TO_SERVER, client, file, dao, true));
         notifyOwner(file, client, "updated");
         return transactionID;
     }
@@ -176,11 +176,11 @@ public class Controller extends UnicastRemoteObject implements FileServer {
                 throw new FileException();
 
             Client client = clients.get(session.id);
-            if (!client.account.equals(file.owner))
+            if (!client.account.getName().equals(file.getOwnerName()))
                 throw new PermissionException();
 
-            file.isPublic = isPublic;
-            file.isReadOnly = isReadOnly;
+            file.setPublic(isPublic);
+            file.setReadOnly(isReadOnly);
         } finally {
             dao.updateEntity();
         }
@@ -200,11 +200,11 @@ public class Controller extends UnicastRemoteObject implements FileServer {
                 throw new FileException();
 
             Client client = clients.get(session.id);
-            if ((!file.isPublic || file.isReadOnly) && !client.account.equals(file.owner))
+            if ((!file.isPublic() || file.isReadOnly()) && !client.account.getName().equals(file.getOwnerName()))
                 throw new PermissionException();
 
             notifyOwner(file, client, "renamed to " + newName);
-            file.name = newName;
+            file.rename(newName);
         } finally {
             dao.updateEntity();
         }
@@ -223,7 +223,7 @@ public class Controller extends UnicastRemoteObject implements FileServer {
             throw new FileException();
 
         Client client = clients.get(session.id);
-        if ((!file.isPublic || file.isReadOnly) && !client.account.equals(file.owner))
+        if ((!file.isPublic() || file.isReadOnly()) && !client.account.getName().equals(file.getOwnerName()))
             throw new PermissionException();
         
         notifyOwner(file, client, "deleted");
@@ -239,7 +239,7 @@ public class Controller extends UnicastRemoteObject implements FileServer {
         List<FileDTO> sendFiles = new LinkedList();
         Client client = clients.get(session.id);
         for (FileModel file : files)
-            if (file.isPublic || file.owner.equals(client.account))
+            if (file.isPublic() || client.account.getName().equals(file.getOwnerName()))
                 sendFiles.add(file.toDTO());
         return sendFiles;
     }
@@ -258,23 +258,23 @@ public class Controller extends UnicastRemoteObject implements FileServer {
                 throw new FileException();
 
             Client client = clients.get(session.id);
-            if (!client.account.equals(file.owner))
+            if (!client.account.getName().equals(file.getOwnerName()))
                 throw new PermissionException();
 
-            file.notificationEnabled = true;
+            file.setNotifications(true);
         } finally {
             dao.updateEntity();
         }
     }
     
     private void notifyOwner(FileModel file, Client client, String action) throws RemoteException {
-        if (file.owner == null || client == null || action == null)
+        if (file.getOwnerName() == null || client == null || action == null)
             throw new NullPointerException();
         
-        if (!file.notificationEnabled || file.owner.equals(client.account))
+        if (!file.isNotificationEnabled() || client.account.getName().equals(file.getOwnerName()))
             return;
       
-        Client ownerClient = clients.get(file.owner.lastSessionID);
+        Client ownerClient = clients.get(file.getOwnerSessionID());
         if (ownerClient != null)
             ownerClient.client.pushNotification(file.toDTO(), action, client.account.toDTO());
     }

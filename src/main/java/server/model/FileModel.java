@@ -28,6 +28,11 @@ import javax.persistence.Version;
     ),
     
     @NamedQuery(
+            name = "deleteFileByOwnerName",
+            query = "DELETE FROM File f WHERE f.owner.name LIKE :name"
+    ),
+    
+    @NamedQuery(
             name = "findFileByName",
             query = "SELECT f FROM File f WHERE f.name LIKE :name",
             lockMode = LockModeType.OPTIMISTIC
@@ -51,30 +56,68 @@ public class FileModel implements Serializable {
     @Id
     @Column(name = "id", nullable = false)
     @GeneratedValue(strategy = GenerationType.AUTO)
-    private long fileId;
+    private long id;
     
     @Version
-    @Column(name = "OPTLOCK")
-    private int versionNum;     // If I understand correctly this is essentially a semaphore
-    
+    private int optlock;     // If I understand correctly this is essentially a semaphore
+ 
     @ManyToOne
-    @JoinColumn(name="FILE_ID", nullable = false)
-    public AccountModel owner;
+    @JoinColumn(name="account_id")
+    private AccountModel owner;
     
-    @Column(name = "NAME", nullable = false)
-    public String name;
+    private String name;
+    private int filesize;
+    private boolean ispublic;
+    private boolean isreadonly;
+    private boolean notificationenabled = false;
     
-    @Column(name = "SIZE", nullable = false)
-    public int size;
+    public String getName() {
+        return name;
+    }
     
-    @Column(name = "IS_PUBLIC", nullable = false)
-    public boolean isPublic;
+    public String getOwnerName() {
+        return owner.getName();
+    }
     
-    @Column(name = "IS_READ_ONLY", nullable = false)
-    public boolean isReadOnly;
+    public long getOwnerSessionID() {
+        return owner.getLastSessionID();
+    }
     
-    @Column(name = "NOTIFICATION_ENABLED", nullable = false)
-    public boolean notificationEnabled = false;
+    public int getSize() {
+        return filesize;
+    }
+    
+    public boolean isPublic() {
+        return ispublic;
+    }
+    
+    public boolean isReadOnly() {
+        return isreadonly;
+    }
+    
+    public boolean isNotificationEnabled() {
+        return notificationenabled;
+    }
+    
+    public void setSize(int size) {
+        this.filesize = size;
+    }
+    
+    public void setPublic(boolean isPublic) {
+        this.ispublic = isPublic;
+    }
+    
+    public void setReadOnly(boolean readOnly) {
+        this.isreadonly = readOnly;
+    }
+    
+    public void setNotifications(boolean on) {
+        this.notificationenabled = on;
+    }
+    
+    public void rename(String name) {
+        this.name = name;
+    }
     
     /**
      * A 0-argument constructor is required by JPA
@@ -86,27 +129,30 @@ public class FileModel implements Serializable {
     public FileModel(AccountModel owner, String name, int size, boolean isPublic, boolean isReadOnly) {
         this.owner = owner;
         this.name = name;
-        this.size = size;
-        this.isPublic = isPublic;
-        this.isReadOnly = isReadOnly;
+        this.filesize = size;
+        this.ispublic = isPublic;
+        this.isreadonly = isReadOnly;
     }
     
     public FileDTO toDTO() {
-        return new FileDTO(owner.toDTO(), name, size, isPublic, isReadOnly);
+        return new FileDTO(owner.toDTO(), name, filesize, ispublic, isreadonly);
     }
     
     @Override
     public boolean equals(Object o) {
-        if (o.getClass() == this.getClass())
-            return this.name.compareTo(((FileModel)o).name) == 0;
-        else
+        if (o == null)
             return false;
+        if (o.getClass() != this.getClass())
+            return false;
+        FileModel obj = (FileModel) o;
+        return obj.name.compareTo(this.name) == 0 && obj.filesize == this.filesize;
     }
 
     @Override
     public int hashCode() {
-        int hash = 5;
-        hash = 59 * hash + Objects.hashCode(this.name);
+        int hash = 3;
+        hash = 41 * hash + Objects.hashCode(this.name);
+        hash = 41 * hash + this.filesize;
         return hash;
     }
 }

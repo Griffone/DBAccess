@@ -49,7 +49,8 @@ public class DataAccessObject {
             try {
                 Query q = em.createNamedQuery("findAccountByName", AccountModel.class);
                 q.setParameter("name", username);
-                return (AccountModel) q.getSingleResult();
+                AccountModel result = (AccountModel) q.getSingleResult();
+                return result;
             } catch (NoResultException ex) {
                 return null;
             }
@@ -67,7 +68,13 @@ public class DataAccessObject {
             EntityManager em = beginTransaction();
             Query q = em.createNamedQuery("deleteAccountByName", AccountModel.class);
             q.setParameter("name", username);
-            return q.executeUpdate() > 0;
+            if (q.executeUpdate() > 0) {
+                q = em.createNamedQuery("deleteFileByOwnerName", FileModel.class);
+                q.setParameter("name", username);
+                q.executeUpdate();
+                return true;
+            } else
+                return false;
         } finally {
             commitTransaction();
         }

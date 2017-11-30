@@ -18,12 +18,14 @@ public class Transaction {
     public final Client client;
     public final FileModel file;
     public final DataAccessObject dao;
+    public final boolean alreadyExists;
     
-    public Transaction(TransactionType type, Client client, FileModel file, DataAccessObject dao) {
+    public Transaction(TransactionType type, Client client, FileModel file, DataAccessObject dao, boolean alreadyExists) {
         this.type = type;
         this.client = client;
         this.file = file;
         this.dao = dao;
+        this.alreadyExists = alreadyExists;
     }
     
     public enum TransactionType {

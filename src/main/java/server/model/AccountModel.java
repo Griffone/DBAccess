@@ -7,30 +7,24 @@ package server.model;
 
 import common.AccountDTO;
 import java.io.Serializable;
-import java.util.LinkedList;
-import java.util.List;
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.LockModeType;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
-import javax.persistence.OneToMany;
 import javax.persistence.Version;
 
 @NamedQueries({
     
     @NamedQuery(
             name = "deleteAccountByName",
-            query = "DELETE FROM Account act WHERE act.username LIKE :name"
+            query = "DELETE FROM Account act WHERE act.name LIKE :name"
     ),
     
     @NamedQuery(
             name = "findAccountByName",
-            query = "SELECT act FROM Account act WHERE act.username LIKE :name",
+            query = "SELECT act FROM Account act WHERE act.name LIKE :name",
             lockMode = LockModeType.OPTIMISTIC
     )
 })
@@ -43,25 +37,31 @@ import javax.persistence.Version;
 @Entity(name = "Account")
 public class AccountModel implements Serializable {
     @Id
-    @Column(name = "id", nullable = false)
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private long accountId;
+    @GeneratedValue
+    private long id;
     
     @Version
-    @Column(name = "OPTLOCK")
-    private int versionNum;     // If I understand correctly this is essentially a semaphore
+    private int optlock;     // If I understand correctly this is essentially a semaphore
 
-    @Column(name = "USERNAME", nullable = false)
-    public String username;
+    private String name;
+    private String password;
+    private long lastsessionid;
     
-    @Column(name = "PASSWORD", nullable = false)
-    public String password;
+    public String getName() {
+        return name;
+    }
     
-    @Column(name = "LAST_SESSION_ID", nullable = false)
-    public long lastSessionID;
+    public boolean isPassword(String password) {
+        return (password.compareTo(this.password) == 0);
+    }
     
-    @OneToMany(cascade=CascadeType.REMOVE, mappedBy="owner")
-    public List<FileModel> files;
+    public long getLastSessionID() {
+        return lastsessionid;
+    }
+    
+    public void updateSessionID(long sessionID) {
+        this.lastsessionid = sessionID;
+    }
     
     /**
      * A default 0-arg constructor that is required by JPA
@@ -70,28 +70,12 @@ public class AccountModel implements Serializable {
         this(null, null);
     }
     
-    public AccountModel(String username, String password) {
-        this.username = username;
+    public AccountModel(String name, String password) {
+        this.name = name;
         this.password = password;
-        this.files = new LinkedList();
     }
     
     public AccountDTO toDTO() {
-        return new AccountDTO(username);
-    }
-    
-    public void appendFile(FileModel file) {
-        files.add(file);
-    }
-    
-    @Override
-    public boolean equals(Object o) {
-        if (o == null)
-            return false;
-        if (o.getClass() == this.getClass()) {
-            AccountModel other = (AccountModel) o;
-            return other.username.compareTo(this.username) == 0;
-        }
-        return false;
+        return new AccountDTO(name);
     }
 }

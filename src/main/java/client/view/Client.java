@@ -42,7 +42,7 @@ public class Client implements Runnable {
     private final InetSocketAddress serverAddress;
     private final Scanner console = new Scanner(System.in);
     private final ThreadSafeOut out = new ThreadSafeOut();
-    private final NotificationPusher client;
+    private NotificationPusher client;
     private final FileServer server;
     private Session currentSession;
 
@@ -270,8 +270,9 @@ public class Client implements Runnable {
     
     private void login(String name, String password) throws RemoteException, SessionException {
         try {
+            client = new NotificationPusher();
             currentSession = server.login(client, name, password);
-            out.println("Succesfully logged in! (" + String.valueOf(currentSession.id) + ")");
+            out.println("Succesfully logged in!");
         } catch (LoginException ex) {
             out.println("Wrong username-password combo!");
         }
