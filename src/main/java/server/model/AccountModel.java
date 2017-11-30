@@ -25,12 +25,12 @@ import javax.persistence.Version;
     
     @NamedQuery(
             name = "deleteAccountByName",
-            query = "DELETE FROM Account account WHERE account.username LIKE :name"
+            query = "DELETE FROM Account act WHERE act.username LIKE :name"
     ),
     
     @NamedQuery(
             name = "findAccountByName",
-            query = "SELECT account FROM Account account WHERE account.username LIKE :name",
+            query = "SELECT act FROM Account act WHERE act.username LIKE :name",
             lockMode = LockModeType.OPTIMISTIC
     )
 })
@@ -41,7 +41,7 @@ import javax.persistence.Version;
  * @author Griffone
  */
 @Entity(name = "Account")
-public class Account implements Serializable {
+public class AccountModel implements Serializable {
     @Id
     @Column(name = "id", nullable = false)
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -57,17 +57,20 @@ public class Account implements Serializable {
     @Column(name = "PASSWORD", nullable = false)
     public String password;
     
-    @OneToMany(cascade=CascadeType.ALL, mappedBy="owner")
-    public List<File> files;
+    @Column(name = "LAST_SESSION_ID", nullable = false)
+    public long lastSessionID;
+    
+    @OneToMany(cascade=CascadeType.REMOVE, mappedBy="owner")
+    public List<FileModel> files;
     
     /**
      * A default 0-arg constructor that is required by JPA
      */
-    public Account() {
+    public AccountModel() {
         this(null, null);
     }
     
-    public Account(String username, String password) {
+    public AccountModel(String username, String password) {
         this.username = username;
         this.password = password;
         this.files = new LinkedList();
@@ -77,7 +80,18 @@ public class Account implements Serializable {
         return new AccountDTO(username);
     }
     
-    public void appendFile(File file) {
+    public void appendFile(FileModel file) {
         files.add(file);
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (o == null)
+            return false;
+        if (o.getClass() == this.getClass()) {
+            AccountModel other = (AccountModel) o;
+            return other.username.compareTo(this.username) == 0;
+        }
+        return false;
     }
 }

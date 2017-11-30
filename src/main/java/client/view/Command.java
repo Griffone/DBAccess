@@ -21,20 +21,22 @@ public class Command {
     public static final NamedCommand[] COMMANDS = {
         new NamedCommand("quit", CommandType.CMD_QUIT, "stops and exits the program."),
         new NamedCommand("help", CommandType.CMD_HELP, "prints this message"),
-        new NamedCommand("login", CommandType.CMD_LOGIN, "attempts to log in, must be followed by <username> <password>!"),
-        new NamedCommand("logout", CommandType.CMD_LOGOUT, "log out."),
-        new NamedCommand("createaccount", CommandType.CMD_CREATE_ACCOUNT, "attempts to create a new account, must be followed by <username> <password>!")
+        
+        new NamedCommand("login", CommandType.CMD_ACCOUNT_LOGIN, "attempts to log in, must be followed by <username> <password>!"),
+        new NamedCommand("logout", CommandType.CMD_ACCOUNT_LOGOUT, "log out."),
+        new NamedCommand("createuser", CommandType.CMD_ACCOUNT_CREATE, "attempts to create a new account, must be followed by <username> <password>!"),
+        new NamedCommand("deleteuser", CommandType.CMD_ACCOUNT_DELETE, "deletes the currently logged in account."),
+        
+        new NamedCommand("list", CommandType.CMD_FILE_LIST, "lists available files."),
+        new NamedCommand("upload", CommandType.CMD_FILE_UPLOAD, "attempt to upload a file. Should be followed by <local file name> <server file name> [public] [is-read-only]!"),
+        new NamedCommand("update", CommandType.CMD_FILE_REUPLOAD, "attempt to update a file. Should be followed by <local file name> <server file name>."),
+        new NamedCommand("download", CommandType.CMD_FILE_DOWNLOAD, "attempt to download a file. Should be followed by <server file name>."),
+        new NamedCommand("details", CommandType.CMD_FILE_UPDATE_DETAILS, "update a file's details. Should be followed by <server file name> [public] [is-read-only]!"),
+        new NamedCommand("rename", CommandType.CMD_FILE_RENAME, "update a file's name. Should be followed by <server original file name> <new file name>."),
+        new NamedCommand("delete", CommandType.CMD_FILE_DELETE, "attempt to delete a given file. Should be followed by <server file name>!"),
+        
+        new NamedCommand("notify", CommandType.CMD_FILE_NOTIFY, "the server should notify if a given file is modified. Should be followed by {<server file name>}.")
     };
-    
-    
-    public enum CommandType {
-        CMD_NULL,   // could not parse
-        CMD_HELP,
-        CMD_QUIT,
-        CMD_LOGOUT,
-        CMD_LOGIN,
-        CMD_CREATE_ACCOUNT
-    }
     
     public static class NamedCommand {
         public final String name;
@@ -63,10 +65,7 @@ public class Command {
         if (type == null)
             type = CommandType.CMD_NULL;
         
-        if (isParamsValid(type, params))
-            return new Command(type, params);
-        else
-            return new Command(CommandType.CMD_NULL, null);
+        return new Command(type, params);
     }
     
     private Command(CommandType type, String[] params) {
@@ -74,14 +73,4 @@ public class Command {
         this.params = params;
     }
     
-    private static boolean isParamsValid(CommandType type, String[] params) {
-        switch (type) {
-            case CMD_LOGIN:
-            case CMD_CREATE_ACCOUNT:
-                return params.length >= 2 && params[0].length() > 0 && params[1].length() > 0;
-            
-            default:
-                return true;
-        }
-    }
 }

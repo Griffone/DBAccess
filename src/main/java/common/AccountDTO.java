@@ -19,4 +19,9 @@ public class AccountDTO implements Serializable {
     public AccountDTO(String name) {
         this.username = name;
     }
+    
+    @Override
+    public String toString() {
+        return username;
+    }
 }

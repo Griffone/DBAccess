@@ -5,13 +5,15 @@
  */
 package server.integration;
 
+import java.util.List;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.EntityTransaction;
 import javax.persistence.NoResultException;
 import javax.persistence.Persistence;
 import javax.persistence.Query;
-import server.model.Account;
+import server.model.AccountModel;
+import server.model.FileModel;
 
 /**
  * A wrapper for all interactions between the database and the server
@@ -29,16 +31,25 @@ public class DataAccessObject {
         emf = Persistence.createEntityManagerFactory(ENTITY_MANAGER_NAME);
     }
     
-    public Account findAccount(String username, boolean endTransaction) {
+    public void createAccount(AccountModel account) {
+        try {
+            EntityManager em = beginTransaction();
+            em.persist(account);
+        } finally {
+            commitTransaction();
+        }
+    }
+    
+    public AccountModel findAccount(String username, boolean endTransaction) {
         if (username == null)
             return null;
         
         try {
             EntityManager em = beginTransaction();
             try {
-                Query q = em.createNamedQuery("findAccountByName", Account.class);
+                Query q = em.createNamedQuery("findAccountByName", AccountModel.class);
                 q.setParameter("name", username);
-                return (Account) q.getSingleResult();
+                return (AccountModel) q.getSingleResult();
             } catch (NoResultException ex) {
                 return null;
             }
@@ -54,7 +65,7 @@ public class DataAccessObject {
         
         try {
             EntityManager em = beginTransaction();
-            Query q = em.createNamedQuery("deleteAccountByName", Account.class);
+            Query q = em.createNamedQuery("deleteAccountByName", AccountModel.class);
             q.setParameter("name", username);
             return q.executeUpdate() > 0;
         } finally {
@@ -62,13 +73,57 @@ public class DataAccessObject {
         }
     }
     
-    public void createAccount(Account account) {
+    public void createFile(FileModel file) {
+        EntityManager em = beginTransaction();
+        em.persist(file);
+        commitTransaction();
+    }
+    
+    public FileModel findFile(String name, boolean endTransaction) {
+        if (name == null)
+            return null;
+        
         try {
             EntityManager em = beginTransaction();
-            em.persist(account);
+            try {
+                Query q = em.createNamedQuery("findFileByName", FileModel.class);
+                q.setParameter("name", name);
+                return (FileModel) q.getSingleResult();
+            } catch (NoResultException ex) {
+                return null;
+            }
+        } finally {
+            if (endTransaction)
+                commitTransaction();
+        }
+    }
+    
+    public List<FileModel> getFiles() {
+        try {
+            EntityManager em = beginTransaction();
+            Query q = em.createNamedQuery("getFiles", FileModel.class);
+            return (List<FileModel>) q.getResultList();
         } finally {
             commitTransaction();
         }
+    }
+    
+    public boolean deleteFile(String name) {
+        if (name == null)
+            return false;
+        
+        try {
+            EntityManager em = beginTransaction();
+            Query q = em.createNamedQuery("deleteFileByName", FileModel.class);
+            q.setParameter("name", name);
+            return q.executeUpdate() > 0;
+        } finally {
+            commitTransaction();
+        }
+    }
+    
+    public void updateEntity() {
+        commitTransaction();
     }
     
     /**
@@ -90,5 +145,9 @@ public class DataAccessObject {
      */
     private void commitTransaction() {
         local_em.get().getTransaction().commit();
+    }
+    
+    private void rollbackTransaction() {
+        local_em.get().getTransaction().rollback();
     }
 }

@@ -7,7 +7,9 @@ package client.startup;
 
 import client.view.Client;
 import client.view.Command;
+import common.FileServer;
 import java.net.MalformedURLException;
+import java.net.UnknownHostException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 
@@ -20,8 +22,8 @@ public class Main {
     public static void main(String[] args) {
         try {
             Command.initializeCommands();
-            new Client(args[0]).start();
-        } catch (RemoteException | NotBoundException | MalformedURLException ex) {
+            new Client(args[0], FileServer.FILE_TRANSFER_PORT).start();
+        } catch (RemoteException | NotBoundException | MalformedURLException | UnknownHostException ex) {
             System.out.println("Could not start client!");
         }
     }

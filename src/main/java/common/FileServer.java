@@ -6,8 +6,6 @@
 package common;
 
 import common.exceptions.*;
-import java.net.SocketAddress;
-import java.net.UnknownHostException;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.List;
@@ -20,15 +18,7 @@ import java.util.List;
 public interface FileServer extends Remote {
     
     public static final String NAME_IN_REGISTRY = "FileServer";
-    
-    /**
-     * Get the server's socket address for file transfer
-     * 
-     * @return SocketAddress of the server's listening socket
-     * @throws RemoteException - rmi thrown exception
-     * @throws UnknownHostException - could not resolve local host address
-     */
-    public SocketAddress getServerAddress() throws RemoteException, UnknownHostException;
+    public static final int FILE_TRANSFER_PORT = 4269;
     
     /**
      * Create a new acccount with provided name and password.
@@ -82,11 +72,12 @@ public interface FileServer extends Remote {
      * @param name the name of the file
      * @param isPublic should the public be listed to other accounts?
      * @param isReadOnly should other accounts only be able to read this file? Only necessary for public files
+     * @return the transaction id that is to be used for uploading the file
      * @throws RemoteException - rmi thrown exception
      * @throws SessionException - something wrong with session handle
      * @throws FileException - something is wrong with the file
      */
-    public void createFile(Session session, String name, boolean isPublic, boolean isReadOnly) throws RemoteException, SessionException, FileException;
+    public long createFile(Session session, String name, boolean isPublic, boolean isReadOnly) throws RemoteException, SessionException, FileException;
     
     /**
      * Attempt to flag a file for an update
@@ -94,11 +85,27 @@ public interface FileServer extends Remote {
      * 
      * @param session current session id
      * @param name the name of the file to re-upload
+     * @return the transaction id that is to be used for uploading the file
      * @throws RemoteException - rmi thrown exception
      * @throws SessionException - something wrong with session handle
-     * @throws FileException - file with the provided name could not be found / current session doesn't have correct rights
+     * @throws FileException - file with the provided name could not be found
+     * @throws PermissionException - the currently logged in user has no rights to update the file
      */
-    public void updateFile(Session session, String name) throws RemoteException, SessionException, FileException;
+    public long updateFile(Session session, String name) throws RemoteException, SessionException, FileException, PermissionException;
+    
+    /**
+     * Attempt to download a file.
+     * Should be followed by server->client file transaction
+     * 
+     * @param session current session id
+     * @param name the name of the file to download
+     * @return the transaction id that is to be used for downloading the file
+     * @throws RemoteException - rmi thrown exception
+     * @throws SessionException - something wrong with session handle
+     * @throws FileException - file with provided name could not be found
+     * @throws PermissionException - the currently logged in user has no rights to download the file
+     */
+    public long downloadFile(Session session, String name) throws RemoteException, SessionException, FileException, PermissionException;
     
     /**
      * Update file's access details
@@ -110,9 +117,10 @@ public interface FileServer extends Remote {
      * @param isReadOnly should other accounts only be able to read this file? Only necessary for public files
      * @throws RemoteException - rmi thrown exception
      * @throws SessionException - something wrong with session handle
-     * @throws FileException - file with the provided name could not be found / current session doesn't have correct rights
+     * @throws FileException - file with the provided name could not be found
+     * @throws PermissionException - the currently logged in user has no rights to update the file
      */
-    public void updateFileDetails(Session session, String name, boolean isPublic, boolean isReadOnly) throws RemoteException, SessionException, FileException;
+    public void updateFileDetails(Session session, String name, boolean isPublic, boolean isReadOnly) throws RemoteException, SessionException, FileException, PermissionException;
     
     /**
      * Rename a file
@@ -122,9 +130,10 @@ public interface FileServer extends Remote {
      * @param newName the new name to rename to
      * @throws RemoteException - rmi thrown exception
      * @throws SessionException - something wrong with session handle
-     * @throws FileException - file with the original name could not be found / current session doesn't have correct rights
+     * @throws FileException - file with the original name could not be found
+     * @throws PermissionException - the currently logged in user has no rights to update the file
      */
-    public void renameFile(Session session, String originalName, String newName) throws RemoteException, SessionException, FileException;
+    public void renameFile(Session session, String originalName, String newName) throws RemoteException, SessionException, FileException, PermissionException;
     
     /**
      * Delete a file
@@ -133,9 +142,10 @@ public interface FileServer extends Remote {
      * @param name the name of the file to delete
      * @throws RemoteException - rmi thrown exception
      * @throws SessionException - something wrong with session handle
-     * @throws FileException - file with the provided name could not be found / current session doesn't have correct rights
+     * @throws FileException - file with the provided name could not be found
+     * @throws PermissionException - the currently logged in user has no rights to update the file
      */
-    public void deleteFile(Session session, String name) throws RemoteException, SessionException, FileException;
+    public void deleteFile(Session session, String name) throws RemoteException, SessionException, FileException, PermissionException;
     
     /**
      * Retreive a list of files that can be accessed by current acount
@@ -146,4 +156,16 @@ public interface FileServer extends Remote {
      * @throws SessionException - something wrong with session handle
      */
     public List<FileDTO> getFiles(Session session) throws RemoteException, SessionException;
+    
+    /**
+     * Enable notification when a given file is modified.
+     * 
+     * @param session current session id
+     * @param name the name of the file to be notified about
+     * @throws RemoteException - rmi thrown exception
+     * @throws SessionException - something wrong with session handle
+     * @throws FileException - file with the provided name could not be found
+     * @throws PermissionException - the currently logged in user has no rights to update the file
+     */
+    public void enableNotification(Session session, String name) throws RemoteException, SessionException, FileException, PermissionException;
 }

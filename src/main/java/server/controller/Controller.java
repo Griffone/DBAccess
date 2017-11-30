@@ -11,17 +11,17 @@ import common.exceptions.*;
 import common.NotificationClient;
 import common.Session;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.SocketAddress;
-import java.net.UnknownHostException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import server.controller.Transaction.TransactionType;
 import server.integration.DataAccessObject;
-import server.model.Account;
+import server.model.AccountModel;
+import server.model.FileModel;
 
 /**
  * The controlling code for the server.
@@ -30,21 +30,17 @@ import server.model.Account;
  */
 public class Controller extends UnicastRemoteObject implements FileServer {
 
+    public final ListenThread listener;
     private final DataAccessObject dao;
-    private final ServerSocket listenSocket;
-    private final HashMap<Long, Client> clients;
+    private final Map<Long, Client> clients;
     private static long lastClientSessionID = 0;
+    private static long lastTransactionID = 0;
     
     public Controller(int port) throws RemoteException, IOException {
         super();    // Required for the JRMI to function correctly
+        listener = new ListenThread(port);
         dao = new DataAccessObject();
-        listenSocket = new ServerSocket(port);
-        clients = new HashMap();
-    }
-    
-    @Override
-    public SocketAddress getServerAddress() throws RemoteException, UnknownHostException {
-        return new InetSocketAddress(InetAddress.getLocalHost(), listenSocket.getLocalPort());
+        clients = Collections.synchronizedMap(new HashMap());
     }
 
     @Override
@@ -52,7 +48,7 @@ public class Controller extends UnicastRemoteObject implements FileServer {
         if (dao.findAccount(name, true) != null)
             throw new AccountException();
         else
-            dao.createAccount(new Account(name, password));
+            dao.createAccount(new AccountModel(name, password));
     }
     
     @Override
@@ -60,28 +56,33 @@ public class Controller extends UnicastRemoteObject implements FileServer {
         if (session == null || !clients.containsKey(session.id))
             return;
         
-        Account account = clients.get(session.id).account;
+        AccountModel account = clients.get(session.id).account;
         if (account != null)
             dao.deleteAccount(account.username);
     }
 
     @Override
     public Session login(NotificationClient client, String name, String password) throws RemoteException, LoginException, SessionException {
-        Account account = dao.findAccount(name, true);
-        if (account == null)
-            throw new LoginException();
-        if (account.password.compareTo(password) != 0)
-            throw new LoginException();
-        
-        // Extremely unlikely the server is stable enough to handle a total of 9,223,372,036,854,775,807 clients, but this isn't very expensive check
-        if (++lastClientSessionID == 0)
-            lastClientSessionID++;
-        Session session = new Session(lastClientSessionID);
-        if (clients.containsKey(session.id))
-            throw new SessionException();
-        
-        clients.put(session.id, new Client(account, client));
-        return session;
+        try {
+            AccountModel account = dao.findAccount(name, false);
+            if (account == null)
+                throw new LoginException();
+            if (account.password.compareTo(password) != 0)
+                throw new LoginException();
+
+            // Extremely unlikely the server is stable enough to handle a total of 9,223,372,036,854,775,807 clients, but this isn't very expensive check
+            if (++lastClientSessionID == 0)
+                lastClientSessionID++;
+            Session session = new Session(lastClientSessionID);
+            if (clients.containsKey(session.id))
+                throw new SessionException();
+
+            account.lastSessionID = session.id;
+            clients.put(session.id, new Client(account, client));
+            return session;
+        } finally {
+            dao.updateEntity();
+        }
     }
 
     @Override
@@ -93,33 +94,189 @@ public class Controller extends UnicastRemoteObject implements FileServer {
     }
 
     @Override
-    public void createFile(Session session, String name, boolean isPublic, boolean isReadOnly) throws RemoteException, SessionException, FileException {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public long createFile(Session session, String name, boolean isPublic, boolean isReadOnly) throws RemoteException, SessionException, FileException {
+        if (session == null || !clients.containsKey(session.id))
+            throw new SessionException();
+        
+        if (name == null)
+            throw new NullPointerException();
+        
+        FileModel file = dao.findFile(name, true);
+        if (file != null)
+            throw new FileException();
+        
+        Client client = clients.get(session.id);
+        file = new FileModel(client.account, name, 0, isPublic, isReadOnly);
+        if (++lastTransactionID == 0)
+            lastTransactionID++;
+        long transactionID = lastTransactionID;
+        listener.transactions.put(transactionID, new Transaction(TransactionType.TT_CLIENT_TO_SERVER, clients.get(session.id), file, dao));
+        return transactionID;
+    }
+    
+    @Override
+    public long downloadFile(Session session, String name) throws RemoteException, SessionException, FileException, PermissionException {
+        if (session == null || !clients.containsKey(session.id))
+            throw new SessionException();
+        
+        if (name == null)
+            throw new NullPointerException();
+        
+        FileModel file = dao.findFile(name, true);
+        if (file == null)
+            throw new FileException();
+        
+        Client client = clients.get(session.id);
+        if (!file.isPublic && !client.account.equals(file.owner))
+            throw new PermissionException();
+        
+        if (++lastTransactionID == 0)
+            lastTransactionID++;
+        long transactionID = lastTransactionID;
+        listener.transactions.put(transactionID, new Transaction(TransactionType.TT_SERVER_TO_CLIENT, client, file, dao));
+        notifyOwner(file, client, "downloaded");
+        return transactionID;
     }
 
     @Override
-    public void updateFile(Session session, String name) throws RemoteException, SessionException, FileException {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public long updateFile(Session session, String name) throws RemoteException, SessionException, FileException, PermissionException {
+        if (session == null || !clients.containsKey(session.id))
+            throw new SessionException();
+        
+        if (name == null)
+            throw new NullPointerException();
+        
+        FileModel file = dao.findFile(name, true);
+        if (file == null)
+            throw new FileException();
+        
+        Client client = clients.get(session.id);
+        if ((!file.isPublic || file.isReadOnly) && !client.account.equals(file.owner))
+            throw new PermissionException();
+        
+        if (++lastTransactionID == 0)
+            lastTransactionID++;
+        long transactionID = lastTransactionID;
+        listener.transactions.put(transactionID, new Transaction(TransactionType.TT_CLIENT_TO_SERVER, client, file, dao));
+        notifyOwner(file, client, "updated");
+        return transactionID;
     }
 
     @Override
-    public void updateFileDetails(Session session, String name, boolean isPublic, boolean isReadOnly) throws RemoteException, SessionException, FileException {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public void updateFileDetails(Session session, String name, boolean isPublic, boolean isReadOnly) throws RemoteException, SessionException, FileException, PermissionException {
+        if (session == null || !clients.containsKey(session.id))
+            throw new SessionException();
+        
+        if (name == null)
+            throw new NullPointerException();
+        
+        try {
+            FileModel file = dao.findFile(name, false);
+            if (file == null)
+                throw new FileException();
+
+            Client client = clients.get(session.id);
+            if (!client.account.equals(file.owner))
+                throw new PermissionException();
+
+            file.isPublic = isPublic;
+            file.isReadOnly = isReadOnly;
+        } finally {
+            dao.updateEntity();
+        }
     }
 
     @Override
-    public void renameFile(Session session, String originalName, String newName) throws RemoteException, SessionException, FileException {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public void renameFile(Session session, String originalName, String newName) throws RemoteException, SessionException, FileException, PermissionException {
+        if (session == null || !clients.containsKey(session.id))
+            throw new SessionException();
+        
+        if (originalName == null)
+            throw new NullPointerException();
+        
+        try {
+            FileModel file = dao.findFile(originalName, false);
+            if (file == null)
+                throw new FileException();
+
+            Client client = clients.get(session.id);
+            if ((!file.isPublic || file.isReadOnly) && !client.account.equals(file.owner))
+                throw new PermissionException();
+
+            notifyOwner(file, client, "renamed to " + newName);
+            file.name = newName;
+        } finally {
+            dao.updateEntity();
+        }
     }
 
     @Override
-    public void deleteFile(Session session, String name) throws RemoteException, SessionException, FileException {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public void deleteFile(Session session, String name) throws RemoteException, SessionException, FileException, PermissionException {
+        if (session == null || !clients.containsKey(session.id))
+            throw new SessionException();
+        
+        if (name == null)
+            throw new NullPointerException();
+        
+        FileModel file = dao.findFile(name, true);
+        if (file == null)
+            throw new FileException();
+
+        Client client = clients.get(session.id);
+        if ((!file.isPublic || file.isReadOnly) && !client.account.equals(file.owner))
+            throw new PermissionException();
+        
+        notifyOwner(file, client, "deleted");
+        dao.deleteFile(name);
     }
 
     @Override
     public List<FileDTO> getFiles(Session session) throws RemoteException, SessionException {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        if (session == null || !clients.containsKey(session.id))
+            throw new SessionException();
+        
+        List<FileModel> files = dao.getFiles();
+        List<FileDTO> sendFiles = new LinkedList();
+        Client client = clients.get(session.id);
+        for (FileModel file : files)
+            if (file.isPublic || file.owner.equals(client.account))
+                sendFiles.add(file.toDTO());
+        return sendFiles;
+    }
+
+    @Override
+    public void enableNotification(Session session, String name) throws RemoteException, SessionException, FileException, PermissionException {
+        if (session == null || !clients.containsKey(session.id))
+            throw new SessionException();
+        
+        if (name == null)
+            throw new NullPointerException();
+        
+        try {
+            FileModel file = dao.findFile(name, false);
+            if (file == null)
+                throw new FileException();
+
+            Client client = clients.get(session.id);
+            if (!client.account.equals(file.owner))
+                throw new PermissionException();
+
+            file.notificationEnabled = true;
+        } finally {
+            dao.updateEntity();
+        }
+    }
+    
+    private void notifyOwner(FileModel file, Client client, String action) throws RemoteException {
+        if (file.owner == null || client == null || action == null)
+            throw new NullPointerException();
+        
+        if (!file.notificationEnabled || file.owner.equals(client.account))
+            return;
+      
+        Client ownerClient = clients.get(file.owner.lastSessionID);
+        if (ownerClient != null)
+            ownerClient.client.pushNotification(file.toDTO(), action, client.account.toDTO());
     }
     
 }

@@ -6,7 +6,7 @@
 package server.controller;
 
 import common.NotificationClient;
-import server.model.Account;
+import server.model.AccountModel;
 
 /**
  *
@@ -14,10 +14,10 @@ import server.model.Account;
  */
 public class Client {
     
-    public Account account;
+    public AccountModel account;
     public NotificationClient client;
     
-    public Client(Account account, NotificationClient client) {
+    public Client(AccountModel account, NotificationClient client) {
         this.account = account;
         this.client = client;
     }

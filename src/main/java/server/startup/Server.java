@@ -22,7 +22,6 @@ import server.controller.Controller;
 public class Server {
     
     public static final String FILES_DIR = "D:\\Projects\\Java\\HW3\\server_files\\";
-    public static final int PORT = 4269;
     
     public static void main(String[] args) throws IOException {
         try {
@@ -40,7 +39,10 @@ public class Server {
         } catch (RemoteException registry_is_not_running) {
             LocateRegistry.createRegistry(Registry.REGISTRY_PORT);
         }
-        Controller contr = new Controller(PORT);
+        Controller contr = new Controller(4269);
+        Thread t = new Thread(contr.listener);
+        t.setDaemon(true);
+        t.start();
         Naming.rebind(FileServer.NAME_IN_REGISTRY, contr);
     }
 }
